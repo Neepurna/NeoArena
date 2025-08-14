@@ -132,6 +132,7 @@
     timerInterval = setInterval(() => {
       timeRemaining--;
       updateTimer();
+      updateDebugPanel();
       
       if (timeRemaining <= 0) {
         endGame();
@@ -220,6 +221,8 @@
     const selected = document.querySelector('input[name="currentQuestion"]:checked');
     const selectedValue = selected ? parseInt(selected.value) : -1;
     
+    console.log(`Question ${currentQuestionIndex + 1}: User selected ${selectedValue}, correct answer is ${questions[currentQuestionIndex].answer}`);
+    
     userAnswers.push(selectedValue);
     
     // Check if answer is correct
@@ -227,14 +230,17 @@
     if (isCorrect) {
       correctAnswers++;
       timeRemaining += 5; // Add 5 seconds for correct answer
+      console.log('Correct answer! Time bonus added.');
       
       // Show brief feedback
       showAnswerFeedback(true);
     } else {
+      console.log('Incorrect answer.');
       showAnswerFeedback(false);
     }
     
     currentQuestionIndex++;
+    updateDebugPanel();
     
     // Move to next question after brief delay
     setTimeout(() => {
@@ -281,6 +287,12 @@
     stopTimer();
     gameActive = false;
     
+    console.log('Game ended!');
+    console.log('Total user answers:', userAnswers.length);
+    console.log('User answers:', userAnswers);
+    console.log('Correct answers count:', correctAnswers);
+    console.log('Questions length:', questions.length);
+    
     // Calculate final score
     const totalQuestions = userAnswers.length;
     const percentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
@@ -292,6 +304,7 @@
     let resultMessage = '';
     if (correctAnswers === questions.length) {
       resultMessage = '🎉 Perfect Score! You answered all questions correctly!';
+      console.log('Perfect score achieved! Will attempt blockchain submission...');
     } else if (percentage >= 80) {
       resultMessage = `🏆 Excellent! You scored ${correctAnswers}/${totalQuestions} (${percentage}%) - Great job!`;
     } else if (percentage >= 60) {
@@ -311,13 +324,19 @@
 
     // If perfect score, attempt blockchain submission
     if (correctAnswers === questions.length) {
-      // Pad userAnswers array to ensure we have exactly 10 answers
-      const paddedAnswers = [...userAnswers];
-      while (paddedAnswers.length < 10) {
-        paddedAnswers.push(255); // Invalid answer for missing questions
+      console.log('Perfect score detected, preparing blockchain submission...');
+      
+      // Ensure we have exactly 10 answers
+      if (userAnswers.length !== 10) {
+        console.error('Error: Expected 10 answers but got', userAnswers.length);
+        showBlockchainError(`Error: Expected 10 answers but got ${userAnswers.length}`);
+        return;
       }
       
-      await submitToBlockchain(paddedAnswers);
+      console.log('Submitting answers to blockchain:', userAnswers);
+      await submitToBlockchain(userAnswers);
+    } else {
+      console.log('Score not perfect, no blockchain submission needed');
     }
   }
 
@@ -334,29 +353,51 @@
 
   // Initialize Web3 connection
   async function initWeb3() {
+    console.log('Initializing Web3...');
+    
     if (typeof window.ethereum !== 'undefined') {
+      console.log('Ethereum provider detected');
       try {
         // Get user account from localStorage (set by general.js)
         userAccount = localStorage.getItem('walletAddress');
+        console.log('User account from localStorage:', userAccount);
         
         if (userAccount && CONTRACT_ADDRESS !== '0x...') {
+          console.log('Setting up contract with address:', CONTRACT_ADDRESS);
+          
           const provider = new ethers.providers.Web3Provider(window.ethereum);
           web3Contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+          
+          console.log('Contract instance created:', web3Contract);
           
           // Fetch reward amount from contract
           try {
             const rewardWei = await web3Contract.REWARD();
             const rewardEth = ethers.utils.formatEther(rewardWei);
+            console.log('Contract reward amount:', rewardEth, 'ETH');
             updateRewardDisplay(rewardEth);
           } catch (error) {
             console.log('Could not fetch reward amount:', error);
           }
           
           // Check if user has already claimed
-          const hasAlreadyClaimed = await web3Contract.hasClaimed(userAccount);
-          if (hasAlreadyClaimed) {
-            showClaimedMessage();
-            return false;
+          try {
+            const hasAlreadyClaimed = await web3Contract.hasClaimed(userAccount);
+            console.log('User has already claimed:', hasAlreadyClaimed);
+            if (hasAlreadyClaimed) {
+              showClaimedMessage();
+              return false;
+            }
+          } catch (error) {
+            console.log('Could not check claim status:', error);
+          }
+        } else {
+          console.log('No user account or invalid contract address');
+          if (!userAccount) {
+            console.log('No wallet connected');
+          }
+          if (CONTRACT_ADDRESS === '0x...') {
+            console.log('Contract address not set');
           }
         }
         return true;
@@ -364,8 +405,10 @@
         console.error('Web3 initialization error:', error);
         return true; // Continue with quiz even if contract fails
       }
+    } else {
+      console.log('No Ethereum provider found');
+      return true;
     }
-    return true;
   }
 
   // Update reward display on the page
@@ -378,8 +421,14 @@
 
   // Submit answers to smart contract
   async function submitToBlockchain(finalAnswers) {
+    console.log('submitToBlockchain called with:', finalAnswers);
+    console.log('web3Contract:', web3Contract);
+    console.log('userAccount:', userAccount);
+    console.log('CONTRACT_ADDRESS:', CONTRACT_ADDRESS);
+    
     if (!web3Contract || !userAccount || CONTRACT_ADDRESS === '0x...') {
       console.log('Smart contract not configured - skipping blockchain submission');
+      showBlockchainError('Wallet not connected or contract not configured');
       return false;
     }
 
@@ -392,13 +441,15 @@
       const signer = provider.getSigner();
       const contractWithSigner = web3Contract.connect(signer);
 
-      // Submit the exact correct answers as specified: [2,1,1,1,1,1,1,2,1,2]
-      const correctAnswersArray = [2, 1, 1, 1, 1, 1, 1, 2, 1, 2];
+      // Use the actual user answers (already validated to be perfect score)
+      console.log('Submitting user answers to blockchain:', finalAnswers);
       
-      const transaction = await contractWithSigner.submitAnswers(correctAnswersArray);
+      const transaction = await contractWithSigner.submitAnswers(finalAnswers);
+      console.log('Transaction sent:', transaction.hash);
       
       // Wait for transaction to be mined
       const receipt = await transaction.wait();
+      console.log('Transaction receipt:', receipt);
 
       if (receipt.status === 1) {
         showRewardClaimed(transaction.hash);
@@ -484,8 +535,54 @@
     }
   }
 
+  // Add debug panel for troubleshooting
+  function createDebugPanel() {
+    const debugPanel = document.createElement('div');
+    debugPanel.id = 'debugPanel';
+    debugPanel.style.cssText = `
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #00ff00;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 10px;
+      max-width: 300px;
+      z-index: 10000;
+      border: 1px solid #00ff00;
+    `;
+    debugPanel.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 5px;">Debug Info</div>
+      <div id="debugContent">Initializing...</div>
+    `;
+    document.body.appendChild(debugPanel);
+  }
+
+  // Update debug panel with current state
+  function updateDebugPanel() {
+    const debugContent = document.getElementById('debugContent');
+    if (debugContent) {
+      debugContent.innerHTML = `
+        Questions: ${currentQuestionIndex}/${questions.length}<br>
+        Correct: ${correctAnswers}<br>
+        Time: ${timeRemaining}s<br>
+        Answers: [${userAnswers.join(',')}]<br>
+        Wallet: ${userAccount ? userAccount.slice(0,6)+'...' : 'None'}<br>
+        Contract: ${web3Contract ? 'Connected' : 'None'}<br>
+        Game Active: ${gameActive}
+      `;
+    }
+  }
+
   // Initialize the quiz
   async function startQuiz() {
+    console.log('Starting quiz...');
+    
+    // Create debug panel
+    createDebugPanel();
+    
     // Initialize Web3 and check if user has already claimed
     const canProceed = await initWeb3();
     if (!canProceed) {
@@ -497,6 +594,9 @@
     correctAnswers = 0;
     userAnswers = [];
     gameActive = true;
+    
+    console.log('Quiz state initialized');
+    updateDebugPanel();
     
     document.getElementById('tournamentSection').style.display = 'none';
     document.getElementById('createTournamentSection').style.display = 'none';
@@ -519,4 +619,17 @@
       }
     });
   }
+
+  // Create debug panel on load
+  window.addEventListener('load', () => {
+    createDebugPanel();
+    updateDebugPanel();
+  });
+
+  // Update debug panel on every tick
+  setInterval(() => {
+    if (gameActive) {
+      updateDebugPanel();
+    }
+  }, 1000);
 })();
