@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeoArena – Quiz Royale</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+</head>
+<body onload="checkWallet()">
+  <header>Quiz Royale</header>
+  <main>
+    <!-- Tournament selection section -->
+    <div id="tournamentSection">
+      <h2 style="font-family: 'Orbitron', sans-serif;">Prebuilt Tournament</h2>
+      <p style="font-size: 1rem;" data-reward>Reward: 0.05 Sepolia ETH*</p>
+      <p style="font-size: 0.9rem; color: var(--secondary-color);">⏱️ 60 seconds base time + 5 seconds per correct answer</p>
+      <p style="font-size: 0.9rem; color: var(--primary-color);">🎯 Questions appear one by one - click an answer to proceed</p>
+      <p style="font-size: 0.9rem; color: #ffaa00;">🔗 Smart contract automatically distributes rewards</p>
+      <p style="font-size: 0.8rem;">*Perfect score required. Rewards distributed via on-chain verification.</p>
+      <button class="button" id="startQuizBtn">Start Quiz</button>
+    </div>
+    <!-- Create tournament placeholder -->
+    <div id="createTournamentSection" style="margin-top: 3rem;">
+      <h2 style="font-family: 'Orbitron', sans-serif;">Create Tournament</h2>
+      <p style="font-size: 1rem;">Feature coming soon – design your own quizzes and challenge friends.</p>
+      <button class="button" disabled>Create (Soon)</button>
+    </div>
+    <!-- Quiz container hidden by default -->
+    <div id="quizContainer" style="display: none;">
+      <h2 style="font-family: 'Orbitron', sans-serif; text-align: center; margin-bottom: 2rem;">General Knowledge Quiz</h2>
+      <form id="quizForm"></form>
+      <button class="button" id="submitBtn" style="margin-top: 1rem; display: none;">Submit</button>
+      <div class="results" id="results"></div>
+    </div>
+  </main>
+  <script src="general.js"></script>
+  <script src="quiz.js"></script>
+</body>
+</html>

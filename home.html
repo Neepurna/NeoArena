@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeoArena – Home</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body onload="checkWallet()">
+  <header>NeoArena</header>
+  <main>
+    <h2 style="text-align: center; font-family: 'Orbitron', sans-serif; margin-bottom: 1rem;">Select a Game</h2>
+    <div class="card-container">
+      <!-- Quiz Royale Card -->
+      <div class="card">
+        <h3>Quiz Royale</h3>
+        <p>Test your knowledge and win rewards.</p>
+        <button class="button" onclick="window.location.href='quiz.html'">Play</button>
+      </div>
+      <!-- Amazing Race Placeholder Card -->
+      <div class="card locked">
+        <h3>Amazing Race</h3>
+        <p>Coming Soon</p>
+        <div class="lock-overlay">🔒</div>
+      </div>
+      <!-- Legends of Kathmandu Valley Placeholder Card -->
+      <div class="card locked">
+        <h3>Legends of Kathmandu Valley</h3>
+        <p>Coming Soon</p>
+        <div class="lock-overlay">🔒</div>
+      </div>
+    </div>
+  </main>
+  <script src="general.js"></script>
+</body>
+</html>
