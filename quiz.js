@@ -66,6 +66,7 @@
   let correctAnswers = 0;
   let userAnswers = [];
   let gameActive = false;
+  let processingAnswer = false; // Prevent double submissions
 
   const startBtn = document.getElementById('startQuizBtn');
   const quizContainer = document.getElementById('quizContainer');
@@ -198,7 +199,12 @@
       label.appendChild(input);
       label.appendChild(span);
       
-      // Click handler removed to prevent double submission
+      // Add click handler to automatically advance to next question
+      label.addEventListener('click', () => {
+        setTimeout(() => {
+          submitCurrentAnswer();
+        }, 100); // Small delay to ensure radio button is selected
+      });
       
       optionsDiv.appendChild(label);
     });
@@ -206,37 +212,31 @@
     div.appendChild(optionsDiv);
     quizForm.appendChild(div);
 
-    // Update submit button text and show it
+    // Update submit button - only show for the final question
     if (currentQuestionIndex === questions.length - 1) {
       submitBtn.textContent = 'Finish Quiz';
+      submitBtn.style.display = 'inline-block';
     } else {
-      submitBtn.textContent = 'Next Question';
+      submitBtn.style.display = 'none'; // Hide submit button for auto-advance
     }
-    submitBtn.style.display = 'inline-block'; // Always show submit button
   }
 
   // Submit current answer and move to next question
   function submitCurrentAnswer() {
-    console.log(`🔍 submitCurrentAnswer called - Question ${currentQuestionIndex + 1}, gameActive: ${gameActive}`);
+    console.log(`🔍 submitCurrentAnswer called - Question ${currentQuestionIndex + 1}, gameActive: ${gameActive}, processing: ${processingAnswer}`);
     
-    if (!gameActive) {
-      console.log('❌ Game not active, returning');
-      return;
-    }
-    
-    // Prevent multiple submissions for the same question
-    if (document.getElementById('submitBtn').disabled) {
-      console.log('❌ Submit button disabled, returning');
+    if (!gameActive || processingAnswer) {
+      console.log('❌ Game not active or already processing, returning');
       return;
     }
     
     console.log('✅ Processing answer submission...');
-    document.getElementById('submitBtn').disabled = true;
+    processingAnswer = true; // Set flag to prevent double submissions
 
     const selected = document.querySelector('input[name="currentQuestion"]:checked');
     if (!selected) {
-      alert('Please select an answer before proceeding.');
-      document.getElementById('submitBtn').disabled = false;
+      console.log('❌ No answer selected');
+      processingAnswer = false;
       return;
     }
     
@@ -272,10 +272,7 @@
     // Move to next question after brief delay
     setTimeout(() => {
       loadCurrentQuestion();
-      // Re-enable submit button for next question
-      if (document.getElementById('submitBtn')) {
-        document.getElementById('submitBtn').disabled = false;
-      }
+      processingAnswer = false; // Reset processing flag for next question
     }, 1000);
   }
 
@@ -313,10 +310,10 @@
   }
 
   // End the game
-  // End the game
   async function endGame() {
     stopTimer();
     gameActive = false;
+    processingAnswer = false; // Reset processing flag
     
     console.log('Game ended!');
     console.log('Total user answers:', userAnswers.length);
@@ -816,6 +813,7 @@
     correctAnswers = 0;
     userAnswers = [];
     gameActive = true;
+    processingAnswer = false; // Reset processing flag
     
     console.log('Quiz state initialized');
     updateDebugPanel();
