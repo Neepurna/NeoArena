@@ -371,12 +371,13 @@
     }
   }
 
-  // Smart contract integration
-  const CONTRACT_ADDRESS = '0x40C680b4Ed27655FA5414eBa2103aE2231d126ea'; // Your deployed contract address
+  // Smart contract integration - Updated NeoArenaQuizV2
+  const CONTRACT_ADDRESS = '0x5A2b392BF7438E578473Cd4C58e865410A0Eb5E5'; // NeoArenaQuizV2 contract address
   const CONTRACT_ABI = [
-    "function submitAnswers(uint8[10] userAnswers) external",
-    "function REWARD() view returns (uint256)",
-    "function hasClaimed(address) view returns (bool)"
+    "function submitAnswers(uint8[10] user) external",
+    "function reward() view returns (uint256)",
+    "function hasClaimed(address) view returns (bool)",
+    "function contractBalance() view returns (uint256)"
   ];
 
   let web3Contract = null;
@@ -412,7 +413,7 @@
             console.log('Contract instance created:', web3Contract);
             
             // Test contract connection by calling a read-only function
-            const rewardWei = await web3Contract.REWARD();
+            const rewardWei = await web3Contract.reward();
             const rewardEth = ethers.utils.formatEther(rewardWei);
             console.log('Contract reward amount:', rewardEth, 'ETH');
             
@@ -421,11 +422,10 @@
             const balanceEth = ethers.utils.formatEther(contractBalance);
             console.log('Contract balance:', balanceEth, 'ETH');
             
-            // Check if contract has sufficient funds for our 0.005 ETH reward
-            const desiredRewardWei = ethers.utils.parseEther('0.005');
-            const hasEnoughFunds = contractBalance.gte(desiredRewardWei);
-            console.log('Contract has enough funds for 0.005 ETH reward:', hasEnoughFunds);
-            console.log('Desired reward: 0.005 ETH, Contract balance:', balanceEth, 'ETH');
+            // Check if contract has sufficient funds using the actual reward amount
+            const hasEnoughFunds = contractBalance.gte(rewardWei);
+            console.log('Contract has enough funds for reward:', hasEnoughFunds);
+            console.log('Required reward:', rewardEth, 'ETH, Contract balance:', balanceEth, 'ETH');
             
             updateRewardDisplay(rewardEth, balanceEth, hasEnoughFunds);
             
@@ -472,22 +472,21 @@
 
   // Update reward display on the page
   function updateRewardDisplay(rewardAmount, contractBalance = null, hasEnoughFunds = true) {
-    // Override with 0.005 ETH for better user experience
-    const displayReward = '0.005';
+    // Use the actual contract reward amount since V2 contract has correct 0.005 ETH
     const rewardElements = document.querySelectorAll('[data-reward]');
     
     rewardElements.forEach(element => {
       if (hasEnoughFunds) {
-        element.textContent = `Reward: ${displayReward} Sepolia ETH*`;
+        element.textContent = `Reward: ${rewardAmount} Sepolia ETH*`;
         element.style.color = '#00e1ff';
       } else {
-        element.textContent = `Reward: ${displayReward} Sepolia ETH* (Currently Unavailable)`;
+        element.textContent = `Reward: ${rewardAmount} Sepolia ETH* (Currently Unavailable)`;
         element.style.color = '#ff6b6b';
         element.title = `Contract balance: ${contractBalance} ETH - Insufficient funds for rewards`;
       }
     });
     
-    console.log(`Reward display updated to ${displayReward} ETH (contract has ${rewardAmount} ETH reward, ${contractBalance} ETH balance, sufficient: ${hasEnoughFunds})`);
+    console.log(`Reward display updated to ${rewardAmount} ETH (contract balance: ${contractBalance} ETH, sufficient: ${hasEnoughFunds})`);
   }
 
   // Show contract funding status indicator
@@ -542,13 +541,16 @@
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const contractBalance = await provider.getBalance(CONTRACT_ADDRESS);
       const balanceEth = ethers.utils.formatEther(contractBalance);
-      const desiredRewardWei = ethers.utils.parseEther('0.005');
+      
+      // Get the current reward amount from the contract
+      const rewardWei = await web3Contract.reward();
+      const rewardEth = ethers.utils.formatEther(rewardWei);
       
       console.log('Pre-submission check - Contract balance:', balanceEth, 'ETH');
-      console.log('Required reward: 0.005 ETH');
+      console.log('Required reward:', rewardEth, 'ETH');
       
-      if (contractBalance.lt(desiredRewardWei)) {
-        showBlockchainError(`🏦 Contract has insufficient funds for reward. Balance: ${balanceEth} ETH, Required: 0.005 ETH`);
+      if (contractBalance.lt(rewardWei)) {
+        showBlockchainError(`🏦 Contract has insufficient funds for reward. Balance: ${balanceEth} ETH, Required: ${rewardEth} ETH`);
         return false;
       }
       
@@ -633,12 +635,23 @@
   }
 
   // Show successful reward claim
-  function showRewardClaimed(txHash) {
+  async function showRewardClaimed(txHash) {
+    // Get the actual reward amount from contract
+    let rewardAmount = '0.005'; // fallback
+    try {
+      if (web3Contract) {
+        const rewardWei = await web3Contract.reward();
+        rewardAmount = ethers.utils.formatEther(rewardWei);
+      }
+    } catch (error) {
+      console.log('Could not fetch reward amount, using fallback');
+    }
+
     const statusDiv = document.getElementById('blockchainStatus');
     if (statusDiv) {
       statusDiv.innerHTML = `
         <h4 style="color: #00ff00; margin: 0 0 0.5rem 0;">🎉 Reward Claimed!</h4>
-        <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem;">0.005 Sepolia ETH sent to your wallet</p>
+        <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem;">${rewardAmount} Sepolia ETH sent to your wallet</p>
         <a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" 
            style="color: var(--primary-color); text-decoration: none; font-size: 0.8rem;">
           View Transaction ↗
