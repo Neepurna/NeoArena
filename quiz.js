@@ -415,7 +415,20 @@
             const rewardWei = await web3Contract.REWARD();
             const rewardEth = ethers.utils.formatEther(rewardWei);
             console.log('Contract reward amount:', rewardEth, 'ETH');
-            updateRewardDisplay(rewardEth);
+            
+            // Check contract balance
+            const contractBalance = await provider.getBalance(CONTRACT_ADDRESS);
+            const balanceEth = ethers.utils.formatEther(contractBalance);
+            console.log('Contract balance:', balanceEth, 'ETH');
+            
+            // Check if contract has sufficient funds
+            const hasEnoughFunds = contractBalance.gte(rewardWei);
+            console.log('Contract has enough funds for reward:', hasEnoughFunds);
+            
+            updateRewardDisplay(rewardEth, balanceEth, hasEnoughFunds);
+            
+            // Show funding status indicator if needed
+            showFundingStatus(hasEnoughFunds, balanceEth);
             
             // Check if user has already claimed
             const hasAlreadyClaimed = await web3Contract.hasClaimed(userAccount);
@@ -456,14 +469,57 @@
   }
 
   // Update reward display on the page
-  function updateRewardDisplay(rewardAmount) {
+  function updateRewardDisplay(rewardAmount, contractBalance = null, hasEnoughFunds = true) {
     // Override with 0.005 ETH for better user experience
     const displayReward = '0.005';
     const rewardElements = document.querySelectorAll('[data-reward]');
+    
     rewardElements.forEach(element => {
-      element.textContent = `Reward: ${displayReward} Sepolia ETH*`;
+      if (hasEnoughFunds) {
+        element.textContent = `Reward: ${displayReward} Sepolia ETH*`;
+        element.style.color = '#00e1ff';
+      } else {
+        element.textContent = `Reward: ${displayReward} Sepolia ETH* (Currently Unavailable)`;
+        element.style.color = '#ff6b6b';
+        element.title = `Contract balance: ${contractBalance} ETH - Insufficient funds for rewards`;
+      }
     });
-    console.log(`Reward display updated to ${displayReward} ETH (contract has ${rewardAmount} ETH)`);
+    
+    console.log(`Reward display updated to ${displayReward} ETH (contract has ${rewardAmount} ETH reward, ${contractBalance} ETH balance, sufficient: ${hasEnoughFunds})`);
+  }
+
+  // Show contract funding status indicator
+  function showFundingStatus(hasEnoughFunds, contractBalance) {
+    // Remove existing indicator if present
+    const existingIndicator = document.getElementById('fundingStatusIndicator');
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
+    
+    if (!hasEnoughFunds) {
+      const indicator = document.createElement('div');
+      indicator.id = 'fundingStatusIndicator';
+      indicator.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(255, 107, 107, 0.9);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 11px;
+        z-index: 10002;
+        border: 2px solid #ff6b6b;
+        max-width: 200px;
+        text-align: center;
+      `;
+      indicator.innerHTML = `
+        🏦 REWARDS UNAVAILABLE<br>
+        <span style="font-size: 10px;">Contract balance: ${contractBalance} ETH</span>
+      `;
+      document.body.appendChild(indicator);
+    }
   }
 
   // Submit answers to smart contract
@@ -511,8 +567,17 @@
         showBlockchainError('Incorrect answers - no reward claimed');
       } else if (error.message.includes('already claimed')) {
         showBlockchainError('Reward already claimed by this address');
-      } else if (error.message.includes('insufficient contract balance') || error.message.includes('Insufficient contract balance')) {
-        showBlockchainError('🏦 Contract temporarily out of funds. Please try again later or contact support.');
+      } else if (error.message.includes('insufficient contract balance') || 
+                 error.message.includes('Insufficient contract balance') ||
+                 error.code === 'UNPREDICTABLE_GAS_LIMIT') {
+        // Check current contract balance for more detailed error
+        try {
+          const contractBalance = await provider.getBalance(CONTRACT_ADDRESS);
+          const balanceEth = ethers.utils.formatEther(contractBalance);
+          showBlockchainError(`🏦 Contract temporarily out of funds (Balance: ${balanceEth} ETH). The quiz rewards will be available again once the contract is refunded. Please try again later!`);
+        } catch (balanceError) {
+          showBlockchainError('🏦 Contract temporarily out of funds. Please try again later or contact support.');
+        }
       } else if (error.code === 4001) {
         showBlockchainError('Transaction rejected by user');
       } else {
