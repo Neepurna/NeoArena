@@ -354,6 +354,14 @@
   // Initialize Web3 connection
   async function initWeb3() {
     console.log('Initializing Web3...');
+    console.log('Ethers available:', typeof ethers !== 'undefined');
+    console.log('Ethereum provider available:', typeof window.ethereum !== 'undefined');
+    
+    if (typeof ethers === 'undefined') {
+      console.error('Ethers.js not loaded! Check if CDN is working.');
+      showBlockchainError('Ethers.js library not loaded. Please refresh the page.');
+      return true; // Continue with quiz anyway
+    }
     
     if (typeof window.ethereum !== 'undefined') {
       console.log('Ethereum provider detected');
@@ -365,48 +373,53 @@
         if (userAccount && CONTRACT_ADDRESS !== '0x...') {
           console.log('Setting up contract with address:', CONTRACT_ADDRESS);
           
-          const provider = new ethers.providers.Web3Provider(window.ethereum);
-          web3Contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-          
-          console.log('Contract instance created:', web3Contract);
-          
-          // Fetch reward amount from contract
           try {
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            console.log('Provider created:', provider);
+            
+            web3Contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+            console.log('Contract instance created:', web3Contract);
+            
+            // Test contract connection by calling a read-only function
             const rewardWei = await web3Contract.REWARD();
             const rewardEth = ethers.utils.formatEther(rewardWei);
             console.log('Contract reward amount:', rewardEth, 'ETH');
             updateRewardDisplay(rewardEth);
-          } catch (error) {
-            console.log('Could not fetch reward amount:', error);
-          }
-          
-          // Check if user has already claimed
-          try {
+            
+            // Check if user has already claimed
             const hasAlreadyClaimed = await web3Contract.hasClaimed(userAccount);
             console.log('User has already claimed:', hasAlreadyClaimed);
             if (hasAlreadyClaimed) {
               showClaimedMessage();
               return false;
             }
-          } catch (error) {
-            console.log('Could not check claim status:', error);
+            
+            console.log('Web3 initialization successful!');
+          } catch (contractError) {
+            console.error('Contract setup error:', contractError);
+            showBlockchainError('Failed to connect to smart contract: ' + contractError.message);
+            // Continue with quiz even if contract fails
           }
         } else {
           console.log('No user account or invalid contract address');
           if (!userAccount) {
-            console.log('No wallet connected');
+            console.log('No wallet connected - user needs to connect wallet first');
+            showBlockchainError('Please connect your wallet to claim rewards');
           }
           if (CONTRACT_ADDRESS === '0x...') {
             console.log('Contract address not set');
+            showBlockchainError('Smart contract not configured');
           }
         }
         return true;
       } catch (error) {
         console.error('Web3 initialization error:', error);
+        showBlockchainError('Web3 initialization failed: ' + error.message);
         return true; // Continue with quiz even if contract fails
       }
     } else {
-      console.log('No Ethereum provider found');
+      console.log('No Ethereum provider found - MetaMask not installed');
+      showBlockchainError('MetaMask not detected. Install MetaMask to claim rewards.');
       return true;
     }
   }
@@ -522,17 +535,44 @@
     }
   }
 
-  // Show blockchain error
+  // Show blockchain error in the results area
   function showBlockchainError(message) {
-    const statusDiv = document.getElementById('blockchainStatus');
-    if (statusDiv) {
-      statusDiv.innerHTML = `
-        <h4 style="color: #ff4444; margin: 0 0 0.5rem 0;">❌ Blockchain Error</h4>
-        <p style="margin: 0; font-size: 0.9rem;">${message}</p>
+    console.error('Blockchain error:', message);
+    
+    // If there's already a blockchain status div, update it
+    let statusDiv = document.getElementById('blockchainStatus');
+    if (!statusDiv) {
+      // Create status div if it doesn't exist
+      statusDiv = document.createElement('div');
+      statusDiv.id = 'blockchainStatus';
+      statusDiv.style.cssText = `
+        text-align: center;
+        margin-top: 1rem;
+        padding: 1rem;
+        background: rgba(255, 68, 68, 0.1);
+        border: 1px solid #ff4444;
+        border-radius: 10px;
       `;
-      statusDiv.style.background = 'rgba(255, 68, 68, 0.1)';
-      statusDiv.style.borderColor = '#ff4444';
+      
+      // Add to results area or create a status area
+      const resultsDiv = document.getElementById('results');
+      if (resultsDiv) {
+        resultsDiv.appendChild(statusDiv);
+      } else {
+        // Add after quiz form if results div doesn't exist
+        const quizForm = document.getElementById('quizForm');
+        if (quizForm && quizForm.parentNode) {
+          quizForm.parentNode.appendChild(statusDiv);
+        }
+      }
     }
+    
+    statusDiv.innerHTML = `
+      <h4 style="color: #ff4444; margin: 0 0 0.5rem 0;">⚠️ Blockchain Issue</h4>
+      <p style="margin: 0; font-size: 0.9rem;">${message}</p>
+    `;
+    statusDiv.style.background = 'rgba(255, 68, 68, 0.1)';
+    statusDiv.style.borderColor = '#ff4444';
   }
 
   // Add debug panel for troubleshooting
@@ -564,6 +604,9 @@
   function updateDebugPanel() {
     const debugContent = document.getElementById('debugContent');
     if (debugContent) {
+      const ethersStatus = typeof ethers !== 'undefined' ? 'Loaded' : 'Missing';
+      const metamaskStatus = typeof window.ethereum !== 'undefined' ? 'Available' : 'Missing';
+      
       debugContent.innerHTML = `
         Questions: ${currentQuestionIndex}/${questions.length}<br>
         Correct: ${correctAnswers}<br>
@@ -571,6 +614,8 @@
         Answers: [${userAnswers.join(',')}]<br>
         Wallet: ${userAccount ? userAccount.slice(0,6)+'...' : 'None'}<br>
         Contract: ${web3Contract ? 'Connected' : 'None'}<br>
+        Ethers: ${ethersStatus}<br>
+        MetaMask: ${metamaskStatus}<br>
         Game Active: ${gameActive}
       `;
     }
@@ -582,6 +627,12 @@
     
     // Create debug panel
     createDebugPanel();
+    
+    // Wait a bit for ethers to load if needed
+    if (typeof ethers === 'undefined') {
+      console.log('Waiting for ethers.js to load...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
     
     // Initialize Web3 and check if user has already claimed
     const canProceed = await initWeb3();

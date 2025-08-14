@@ -6,6 +6,20 @@
   <title>NeoArena – Quiz Royale</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+  <script>
+    // Fallback ethers loading check
+    if (typeof ethers === 'undefined') {
+      console.error('Ethers.js failed to load from CDN');
+      // Try alternative CDN
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js';
+      script.onload = () => console.log('Ethers.js loaded from fallback CDN');
+      script.onerror = () => console.error('Fallback ethers.js also failed to load');
+      document.head.appendChild(script);
+    } else {
+      console.log('Ethers.js loaded successfully:', ethers.version);
+    }
+  </script>
 </head>
 <body onload="checkWallet()">
   <header>Quiz Royale</header>
