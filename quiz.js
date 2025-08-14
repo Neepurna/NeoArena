@@ -150,10 +150,15 @@
 
   // Render a single question
   function loadCurrentQuestion() {
+    console.log(`🔍 loadCurrentQuestion called - Index ${currentQuestionIndex}/${questions.length}`);
+    
     if (currentQuestionIndex >= questions.length) {
+      console.log('✅ All questions completed, ending game');
       endGame();
       return;
     }
+
+    console.log(`📋 Loading question ${currentQuestionIndex + 1}: ${questions[currentQuestionIndex].question}`);
 
     const question = questions[currentQuestionIndex];
     quizForm.innerHTML = '';
@@ -212,10 +217,36 @@
 
   // Submit current answer and move to next question
   function submitCurrentAnswer() {
-    if (!gameActive) return;
+    console.log(`🔍 submitCurrentAnswer called - Question ${currentQuestionIndex + 1}, gameActive: ${gameActive}`);
+    
+    if (!gameActive) {
+      console.log('❌ Game not active, returning');
+      return;
+    }
+    
+    // Prevent multiple submissions for the same question
+    if (document.getElementById('submitBtn').disabled) {
+      console.log('❌ Submit button disabled, returning');
+      return;
+    }
+    
+    console.log('✅ Processing answer submission...');
+    document.getElementById('submitBtn').disabled = true;
 
     const selected = document.querySelector('input[name="currentQuestion"]:checked');
-    const selectedValue = selected ? parseInt(selected.value) : -1;
+    if (!selected) {
+      alert('Please select an answer before proceeding.');
+      document.getElementById('submitBtn').disabled = false;
+      return;
+    }
+    
+    let selectedValue = parseInt(selected.value);
+    
+    // Test mode: automatically select correct answer
+    if (testMode) {
+      selectedValue = questions[currentQuestionIndex].answer;
+      console.log(`🧪 Test mode: Auto-selecting correct answer ${selectedValue}`);
+    }
     
     console.log(`Question ${currentQuestionIndex + 1}: User selected ${selectedValue}, correct answer is ${questions[currentQuestionIndex].answer}`);
     
@@ -241,6 +272,10 @@
     // Move to next question after brief delay
     setTimeout(() => {
       loadCurrentQuestion();
+      // Re-enable submit button for next question
+      if (document.getElementById('submitBtn')) {
+        document.getElementById('submitBtn').disabled = false;
+      }
     }, 1000);
   }
 
@@ -422,10 +457,13 @@
 
   // Update reward display on the page
   function updateRewardDisplay(rewardAmount) {
+    // Override with 0.005 ETH for better user experience
+    const displayReward = '0.005';
     const rewardElements = document.querySelectorAll('[data-reward]');
     rewardElements.forEach(element => {
-      element.textContent = `Reward: ${rewardAmount} Sepolia ETH*`;
+      element.textContent = `Reward: ${displayReward} Sepolia ETH*`;
     });
+    console.log(`Reward display updated to ${displayReward} ETH (contract has ${rewardAmount} ETH)`);
   }
 
   // Submit answers to smart contract
@@ -473,8 +511,8 @@
         showBlockchainError('Incorrect answers - no reward claimed');
       } else if (error.message.includes('already claimed')) {
         showBlockchainError('Reward already claimed by this address');
-      } else if (error.message.includes('insufficient contract balance')) {
-        showBlockchainError('Contract has insufficient funds');
+      } else if (error.message.includes('insufficient contract balance') || error.message.includes('Insufficient contract balance')) {
+        showBlockchainError('🏦 Contract temporarily out of funds. Please try again later or contact support.');
       } else if (error.code === 4001) {
         showBlockchainError('Transaction rejected by user');
       } else {
@@ -520,7 +558,7 @@
     if (statusDiv) {
       statusDiv.innerHTML = `
         <h4 style="color: #00ff00; margin: 0 0 0.5rem 0;">🎉 Reward Claimed!</h4>
-        <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem;">0.05 Sepolia ETH sent to your wallet</p>
+        <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem;">0.005 Sepolia ETH sent to your wallet</p>
         <a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" 
            style="color: var(--primary-color); text-decoration: none; font-size: 0.8rem;">
           View Transaction ↗
