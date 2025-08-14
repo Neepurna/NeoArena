@@ -193,12 +193,7 @@
       label.appendChild(input);
       label.appendChild(span);
       
-      // Add click handler to automatically move to next question
-      label.addEventListener('click', () => {
-        setTimeout(() => {
-          submitCurrentAnswer();
-        }, 100); // Small delay to ensure radio button is selected
-      });
+      // Click handler removed to prevent double submission
       
       optionsDiv.appendChild(label);
     });
@@ -206,12 +201,13 @@
     div.appendChild(optionsDiv);
     quizForm.appendChild(div);
 
-    // Update submit button text
+    // Update submit button text and show it
     if (currentQuestionIndex === questions.length - 1) {
       submitBtn.textContent = 'Finish Quiz';
     } else {
-      submitBtn.style.display = 'none'; // Hide submit button since auto-advance is enabled
+      submitBtn.textContent = 'Next Question';
     }
+    submitBtn.style.display = 'inline-block'; // Always show submit button
   }
 
   // Submit current answer and move to next question
@@ -621,6 +617,50 @@
     }
   }
 
+  // Test mode for easy perfect score testing
+  let testMode = false;
+  
+  // Add test mode toggle (press 'T' key during quiz)
+  document.addEventListener('keydown', function(event) {
+    if (event.key.toLowerCase() === 't' && gameActive) {
+      testMode = !testMode;
+      console.log('Test mode:', testMode ? 'ON' : 'OFF');
+      if (testMode) {
+        console.log('🧪 Test mode enabled! Auto-correct answers activated.');
+        showTestModeIndicator();
+      } else {
+        hideTestModeIndicator();
+      }
+    }
+  });
+
+  function showTestModeIndicator() {
+    const indicator = document.createElement('div');
+    indicator.id = 'testModeIndicator';
+    indicator.style.cssText = `
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 165, 0, 0.9);
+      color: black;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      z-index: 10001;
+      border: 2px solid #ffa500;
+    `;
+    indicator.textContent = '🧪 TEST MODE';
+    document.body.appendChild(indicator);
+  }
+
+  function hideTestModeIndicator() {
+    const indicator = document.getElementById('testModeIndicator');
+    if (indicator) {
+      document.body.removeChild(indicator);
+    }
+  }
+
   // Initialize the quiz
   async function startQuiz() {
     console.log('Starting quiz...');
@@ -665,7 +705,7 @@
   if (submitBtn) {
     submitBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      if (gameActive && currentQuestionIndex === questions.length - 1) {
+      if (gameActive) {
         submitCurrentAnswer();
       }
     });
