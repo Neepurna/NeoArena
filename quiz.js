@@ -421,9 +421,11 @@
             const balanceEth = ethers.utils.formatEther(contractBalance);
             console.log('Contract balance:', balanceEth, 'ETH');
             
-            // Check if contract has sufficient funds
-            const hasEnoughFunds = contractBalance.gte(rewardWei);
-            console.log('Contract has enough funds for reward:', hasEnoughFunds);
+            // Check if contract has sufficient funds for our 0.005 ETH reward
+            const desiredRewardWei = ethers.utils.parseEther('0.005');
+            const hasEnoughFunds = contractBalance.gte(desiredRewardWei);
+            console.log('Contract has enough funds for 0.005 ETH reward:', hasEnoughFunds);
+            console.log('Desired reward: 0.005 ETH, Contract balance:', balanceEth, 'ETH');
             
             updateRewardDisplay(rewardEth, balanceEth, hasEnoughFunds);
             
@@ -536,11 +538,24 @@
     }
 
     try {
+      // Pre-submission balance check
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const contractBalance = await provider.getBalance(CONTRACT_ADDRESS);
+      const balanceEth = ethers.utils.formatEther(contractBalance);
+      const desiredRewardWei = ethers.utils.parseEther('0.005');
+      
+      console.log('Pre-submission check - Contract balance:', balanceEth, 'ETH');
+      console.log('Required reward: 0.005 ETH');
+      
+      if (contractBalance.lt(desiredRewardWei)) {
+        showBlockchainError(`🏦 Contract has insufficient funds for reward. Balance: ${balanceEth} ETH, Required: 0.005 ETH`);
+        return false;
+      }
+      
       // Show submission status
       showBlockchainSubmission();
 
       // Get signer for transactions
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const contractWithSigner = web3Contract.connect(signer);
 
